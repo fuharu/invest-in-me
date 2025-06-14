@@ -1,67 +1,106 @@
 "use client";
-import { useFormStore } from "@/store/formStore";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine  } from "recharts";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AIAnalysis } from '@/components/AIAnalysis';
+import { InvestmentAnalysis } from '@/components/InvestmentAnalysis';
 
 export default function AnalysisPage() {
-  const { formData } = useFormStore();
+  const router = useRouter();
+  const [formData, setFormData] = useState<any>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // 仮の計算式（実際はより精緻なロジックに差し替えてください）
-  const startYear = 2024;
-  const endYear = 2049;
-  const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
-  // 教育投資: 5年後から年収増加が始まる想定
-  const educationStart = startYear + 5;
-  const educationAnnualReturn = Number(formData.costFuture) > 0 ? Number(formData.costFuture) / 20 : 60; // 仮: 20年で回収
-  let educationCumulative = 0;
+  useEffect(() => {
+    const data = localStorage.getItem('formData');
+    if (!data) {
+      router.push('/form/step1');
+      return;
+    }
+    setFormData(JSON.parse(data));
+  }, [router]);
 
-  // オルカン投資: 年利5%複利
-  const orukanInitial = Number(formData.costPast) || 100;
-  let orukanCumulative = orukanInitial;
+  useEffect(() => {
+    const analyzeData = async () => {
+      if (!formData) return;
 
-  const data = years.map((year, idx) => {
-    // 教育投資の累積
-    if (year >= educationStart) {
-      educationCumulative += educationAnnualReturn;
-     }
-    // オルカン投資の累積
-    if (idx > 0) {
-      orukanCumulative *= 1.05;
-     }
-     return {
-      year,
-      教育投資: Math.round(educationCumulative),
-      オルカン: Math.round(orukanCumulative),
+      setIsAnalyzing(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.details || '分析に失敗しました');
+        }
+
+        setAiAnalysis(result.analysis);
+      } catch (error) {
+        console.error('Analysis error:', error);
+        setError(error instanceof Error ? error.message : '分析中にエラーが発生しました');
+        setAiAnalysis('');
+      } finally {
+        setIsAnalyzing(false);
+      }
     };
-  });
 
-  // 最終リターン
-  const educationReturn = data[data.length - 1].教育投資;
-  const orukanReturn = data[data.length - 1].オルカン;
+    analyzeData();
+  }, [formData]);
+
+  const handleNext = () => {
+    router.push('/comparison');
+  };
+
+  if (!formData) {
+    return null;
+  }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold mb-4">あなたの教育投資 vs オルカン投資</h1>
-      <div className="mb-8">
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="year" />
-            <YAxis />
-            <Tooltip formatter={(value: number, name: string) => [`${value}万円`, name]} />
-            <Legend />
-            <ReferenceLine x={educationStart} stroke="red" label="社会人スタート" />
-            <Line type="monotone" dataKey="教育投資" stroke="#8884d8" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="オルカン" stroke="#82ca9d" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mb-4">
-        <p>教育投資のリターン: <span className="font-bold">{educationReturn}万円</span></p>
-        <p>オルカン投資のリターン: <span className="font-bold">{orukanReturn}万円</span></p>
-      </div>
-      <div className="flex gap-4">
-        <button className="bg-gray-300 px-4 py-2 rounded">もう一度入力する</button>
-        <button className="bg-blue-500 text-white px-4 py-2 rounded">親にプレゼンする</button>
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-indigo-900 mb-4">
+            AI分析結果
+          </h1>
+          <p className="text-xl text-gray-600">
+            あなたの将来性をAIが分析しました
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          <div className="bg-white p-8 rounded-lg shadow-md">
+            <AIAnalysis
+              analysis={aiAnalysis}
+              isLoading={isAnalyzing}
+              error={error}
+            />
+          </div>
+
+          <div className="bg-white p-8 rounded-lg shadow-md">
+            <InvestmentAnalysis
+              pastEducationCost={Number(formData.cost?.past) || 0}
+              futureEducationCost={Number(formData.cost?.future) || 0}
+              targetIncome={Number(formData.passion?.goal) || 0}
+            />
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={handleNext}
+              className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              投資比較を見る
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
