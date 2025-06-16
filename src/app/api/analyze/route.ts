@@ -30,40 +30,17 @@ GPA: ${schoolInfo.gpa}
 目標年収: ${passion.futureGoals.targetIncome}万円
 目標キャリア: ${passion.futureGoals.targetCareer}
 
-以下の項目について、具体的な数値や事実に基づいて分析してください：
+以下の5項目について、必ず全て「評価（S/A/B/C/D）」「根拠（具体的な理由）」「提案（具体的な改善案）」を含めて、**JSON形式**で出力してください。
 
-1. 学業面での強み
-- 現在の学業成績の評価
-- 専攻分野での将来性
-- 学業面での改善点
+{
+  "学業面での強み": {"評価": "", "根拠": "", "提案": [""]},
+  "スキル面での強み": {"評価": "", "根拠": "", "提案": [""]},
+  "将来性の分析": {"評価": "", "根拠": "", "提案": [""]},
+  "教育投資の価値": {"評価": "", "根拠": "", "提案": [""]},
+  "総合評価": {"評価": "", "根拠": "", "提案": [""]}
+}
 
-2. スキル面での強み
-- 技術スキルの市場価値
-- 実務経験の質と量
-- スキル面での改善点
-
-3. 将来性の分析
-- 目標キャリアの実現可能性
-- 目標年収の達成可能性
-- 市場での競争力
-
-4. 教育投資の価値
-- 投資対効果の予測
-- リスク要因の分析
-- 具体的な投資提案
-
-5. 総合評価
-- 強みの総合評価
-- 改善が必要な点
-- 具体的なアクションプラン
-
-各項目について、以下の形式で回答してください：
-- 評価: [S/A/B/C/D]
-- 根拠: [具体的な理由]
-- 提案: [具体的な改善案]
-
-回答は箇条書きで簡潔に、かつ具体的な数値や事実に基づいて記述してください。
-`;
+必ず上記のJSON形式で出力してください。`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
@@ -83,51 +60,83 @@ GPA: ${schoolInfo.gpa}
 
     const analysis = completion.choices[0].message.content;
 
-    // 分析結果を構造化
-    const structuredAnalysis = {
-      academicStrengths: {
-        evaluation: '',
-        basis: '',
-        suggestions: [] as string[]
-      },
-      skillStrengths: {
-        evaluation: '',
-        basis: '',
-        suggestions: [] as string[]
-      },
-      futurePotential: {
-        evaluation: '',
-        basis: '',
-        suggestions: [] as string[]
-      },
-      investmentValue: {
-        evaluation: '',
-        basis: '',
-        suggestions: [] as string[]
-      },
-      overallAssessment: {
-        evaluation: '',
-        basis: '',
-        suggestions: [] as string[]
-      }
+    let structuredAnalysis = {
+      academicStrengths: { evaluation: '', basis: '', suggestions: [] as string[] },
+      skillStrengths: { evaluation: '', basis: '', suggestions: [] as string[] },
+      futurePotential: { evaluation: '', basis: '', suggestions: [] as string[] },
+      investmentValue: { evaluation: '', basis: '', suggestions: [] as string[] },
+      overallAssessment: { evaluation: '', basis: '', suggestions: [] as string[] }
     };
 
-    // 分析結果をパースして構造化データに変換
     if (analysis) {
-      const sections = analysis.split('\n\n');
-      sections.forEach(section => {
-        if (section.includes('学業面での強み')) {
-          structuredAnalysis.academicStrengths = parseSection(section);
-        } else if (section.includes('スキル面での強み')) {
-          structuredAnalysis.skillStrengths = parseSection(section);
-        } else if (section.includes('将来性の分析')) {
-          structuredAnalysis.futurePotential = parseSection(section);
-        } else if (section.includes('教育投資の価値')) {
-          structuredAnalysis.investmentValue = parseSection(section);
-        } else if (section.includes('総合評価')) {
-          structuredAnalysis.overallAssessment = parseSection(section);
+      // まずJSON形式での出力をパース
+      try {
+        const jsonStart = analysis.indexOf('{');
+        const jsonEnd = analysis.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          const jsonString = analysis.substring(jsonStart, jsonEnd + 1);
+          const parsed = JSON.parse(jsonString);
+          structuredAnalysis = {
+            academicStrengths: {
+              evaluation: parsed["学業面での強み"]?.評価 || '',
+              basis: parsed["学業面での強み"]?.根拠 || '',
+              suggestions: parsed["学業面での強み"]?.提案 || []
+            },
+            skillStrengths: {
+              evaluation: parsed["スキル面での強み"]?.評価 || '',
+              basis: parsed["スキル面での強み"]?.根拠 || '',
+              suggestions: parsed["スキル面での強み"]?.提案 || []
+            },
+            futurePotential: {
+              evaluation: parsed["将来性の分析"]?.評価 || '',
+              basis: parsed["将来性の分析"]?.根拠 || '',
+              suggestions: parsed["将来性の分析"]?.提案 || []
+            },
+            investmentValue: {
+              evaluation: parsed["教育投資の価値"]?.評価 || '',
+              basis: parsed["教育投資の価値"]?.根拠 || '',
+              suggestions: parsed["教育投資の価値"]?.提案 || []
+            },
+            overallAssessment: {
+              evaluation: parsed["総合評価"]?.評価 || '',
+              basis: parsed["総合評価"]?.根拠 || '',
+              suggestions: parsed["総合評価"]?.提案 || []
+            }
+          };
+        } else {
+          // JSONでなければ従来のパース
+          const sections = analysis.split('\n\n');
+          sections.forEach(section => {
+            if (section.includes('学業面での強み')) {
+              structuredAnalysis.academicStrengths = parseSection(section);
+            } else if (section.includes('スキル面での強み')) {
+              structuredAnalysis.skillStrengths = parseSection(section);
+            } else if (section.includes('将来性の分析')) {
+              structuredAnalysis.futurePotential = parseSection(section);
+            } else if (section.includes('教育投資の価値')) {
+              structuredAnalysis.investmentValue = parseSection(section);
+            } else if (section.includes('総合評価')) {
+              structuredAnalysis.overallAssessment = parseSection(section);
+            }
+          });
         }
-      });
+      } catch (e) {
+        // パース失敗時は従来のパース
+        const sections = analysis.split('\n\n');
+        sections.forEach(section => {
+          if (section.includes('学業面での強み')) {
+            structuredAnalysis.academicStrengths = parseSection(section);
+          } else if (section.includes('スキル面での強み')) {
+            structuredAnalysis.skillStrengths = parseSection(section);
+          } else if (section.includes('将来性の分析')) {
+            structuredAnalysis.futurePotential = parseSection(section);
+          } else if (section.includes('教育投資の価値')) {
+            structuredAnalysis.investmentValue = parseSection(section);
+          } else if (section.includes('総合評価')) {
+            structuredAnalysis.overallAssessment = parseSection(section);
+          }
+        });
+      }
     }
 
     return NextResponse.json({ 
