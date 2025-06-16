@@ -45,4 +45,4 @@ next-env.d.ts
 /src/generated/prisma
 
 # firebase
-/src/lib/firebase.ts
+src/lib/firebase.ts
